@@ -3,6 +3,7 @@ package com.redislabs.university.RU102J.dao;
 import com.redislabs.university.RU102J.api.Site;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.ScanResult;
 
 import java.util.*;
 
@@ -41,8 +42,27 @@ public class SiteDaoRedisImpl implements SiteDao {
     // Challenge #1
     @Override
     public Set<Site> findAll() {
-        // START Challenge #1
-        return Collections.emptySet();
-        // END Challenge #1
+        Set<Site> result = new HashSet<>();
+        try(Jedis jedis = jedisPool.getResource()) {
+            String siteIdKey = RedisSchema.getSiteIDsKey();
+            String nextCursor = "0";
+            do {
+                // fetch and update cursor
+                ScanResult<String> rst = jedis.sscan(siteIdKey, nextCursor);
+                if (null == rst || null == rst.getResult() || rst.getResult().isEmpty() || null == rst.getCursor()) {
+                    break;
+                }
+                nextCursor = rst.getCursor();
+                // extract data
+                for (String siteHashKey : rst.getResult()) {
+                    Map<String, String> fields = jedis.hgetAll(siteHashKey);
+                    if (fields == null || fields.isEmpty()) {
+                        continue;
+                    }
+                    result.add(new Site(fields));
+                }
+            } while (!nextCursor.equals("0"));
+        }
+        return result;
     }
 }
