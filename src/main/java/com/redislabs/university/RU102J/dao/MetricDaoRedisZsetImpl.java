@@ -51,6 +51,8 @@ public class MetricDaoRedisZsetImpl implements MetricDao {
         // START Challenge #2
         String metricKey = RedisSchema.getDayMetricKey(siteId, unit, dateTime);
         Integer minuteOfDay = getMinuteOfDay(dateTime);
+        MeasurementMinute mm = new MeasurementMinute(Double.valueOf(value), Integer.valueOf(minuteOfDay));
+        jedis.zadd(metricKey, minuteOfDay, mm.toString());
         // END Challenge #2
     }
 
@@ -91,42 +93,42 @@ public class MetricDaoRedisZsetImpl implements MetricDao {
      * Return up to `count` elements from the sorted set corresponding to
      * the siteId, date, and metric unit specified here.
      */
-    private List<Measurement> getMeasurementsForDate(Long siteId,
-                                                     ZonedDateTime date,
-                                                     MetricUnit unit,
-                                                     Integer count) {
-        // A list of Measurement objects to return.
-        List<Measurement> measurements = new ArrayList<>();
+private List<Measurement> getMeasurementsForDate(Long siteId,
+                                                 ZonedDateTime date,
+                                                 MetricUnit unit,
+                                                 Integer count) {
+    // A list of Measurement objects to return.
+    List<Measurement> measurements = new ArrayList<>();
 
-        try (Jedis jedis = jedisPool.getResource()) {
-            // Get the metric key for the day implied by the date.
-            // metric:[unit-name]:[year-month-day]:[site-id]
-            // e.g.: metrics:whU:2020-01-01:1
-            String metricKey = RedisSchema.getDayMetricKey(siteId, unit, date);
+    try (Jedis jedis = jedisPool.getResource()) {
+        // Get the metric key for the day implied by the date.
+        // metric:[unit-name]:[year-month-day]:[site-id]
+        // e.g.: metrics:whU:2020-01-01:1
+        String metricKey = RedisSchema.getDayMetricKey(siteId, unit, date);
 
-            // Return a reverse range so that we're always consuming from the end
-            // of the sorted set.
-            Set<Tuple> metrics = jedis.zrevrangeWithScores(metricKey, 0, count - 1);
-            for (Tuple minuteValue : metrics) {
-                // Elements of the set are of the form [measurement]:[minute]
-                // The MeasurementMinute class abstracts this for us.
-                MeasurementMinute mm = MeasurementMinute.fromZSetValue(
-                        minuteValue.getElement());
+        // Return a reverse range so that we're always consuming from the end
+        // of the sorted set.
+        Set<Tuple> metrics = jedis.zrevrangeWithScores(metricKey, 0, count - 1);
+        for (Tuple minuteValue : metrics) {
+            // Elements of the set are of the form [measurement]:[minute]
+            // The MeasurementMinute class abstracts this for us.
+            MeasurementMinute mm = MeasurementMinute.fromZSetValue(
+                    minuteValue.getElement());
 
-                // Derive the dateTime for the measurement using the date and
-                // the minute of the day.
-                ZonedDateTime dateTime = getDateFromDayMinute(date,
-                        mm.getMinuteOfDay());
+            // Derive the dateTime for the measurement using the date and
+            // the minute of the day.
+            ZonedDateTime dateTime = getDateFromDayMinute(date,
+                    mm.getMinuteOfDay());
 
-                // Add a new measurement to the list of measurements.
-                measurements.add(new Measurement(siteId, unit, dateTime,
-                        mm.getMeasurement()));
-            }
+            // Add a new measurement to the list of measurements.
+            measurements.add(new Measurement(siteId, unit, dateTime,
+                    mm.getMeasurement()));
         }
-
-        Collections.reverse(measurements);
-        return measurements;
     }
+
+    Collections.reverse(measurements);
+    return measurements;
+}
 
     private ZonedDateTime getDateFromDayMinute(ZonedDateTime dateTime,
                                                Integer dayMinute) {
