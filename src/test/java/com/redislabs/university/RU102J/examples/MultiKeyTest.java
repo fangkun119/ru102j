@@ -53,8 +53,7 @@ public class MultiKeyTest {
 
         Response<Long> hsetResponse = p.hset(statusKey, "available", "true");
         Response<Long> expireResponse = p.expire(statusKey, 1000);
-        Response<Long> saddResponse = p.sadd(availableKey,
-                String.valueOf(siteId));
+        Response<Long> saddResponse = p.sadd(availableKey, String.valueOf(siteId));
 
         p.sync();
 

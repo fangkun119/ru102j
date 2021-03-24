@@ -3,12 +3,13 @@ package com.redislabs.university.RU102J.dao;
 import com.redislabs.university.RU102J.api.MeterReading;
 import com.redislabs.university.RU102J.api.SiteStats;
 import com.redislabs.university.RU102J.script.CompareAndUpdateScript;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.Transaction;
+import redis.clients.jedis.*;
+import redis.clients.jedis.exceptions.JedisDataException;
 
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class SiteStatsDaoRedisImpl implements SiteStatsDao {
@@ -47,7 +48,7 @@ public class SiteStatsDaoRedisImpl implements SiteStatsDao {
             ZonedDateTime day = reading.getDateTime();
             String key = RedisSchema.getSiteStatsKey(siteId, day);
 
-            updateBasic(jedis, key, reading);
+            updateOptimized(jedis, key, reading);
         }
     }
 
@@ -81,8 +82,43 @@ public class SiteStatsDaoRedisImpl implements SiteStatsDao {
     // Challenge #3
     private void updateOptimized(Jedis jedis, String key, MeterReading reading) {
         // START Challenge #3
+        String reportingTime = ZonedDateTime.now(ZoneOffset.UTC).toString();
+
+        // 创建事务
+        Transaction t = jedis.multi();
+
+        // 添加事务中要执行的操作
+        List<Response<? extends Object>> respList = new ArrayList<>();
+        respList.add( t.hset(key, SiteStats.reportingTimeField, reportingTime));
+        respList.add( t.hincrBy(key, SiteStats.countField, 1));
+        respList.add( t.expire(key, weekSeconds));
+        respList.add( compareAndUpdateScript.updateIfGreater(t, key, SiteStats.maxWhField, reading.getWhGenerated()));
+        respList.add( compareAndUpdateScript.updateIfLess(t, key, SiteStats.minWhField, reading.getWhGenerated()));
+        respList.add( compareAndUpdateScript.updateIfGreater(t, key, SiteStats.maxCapacityField, getCurrentCapacity(reading)));
+
+        // 执行事务
+        t.exec();
+
+        // 检查结果，并处理回滚（如果业务逻辑需要回滚）
+        if (hasError(respList)) {
+            t.discard();
+        }
         // END Challenge #3
     }
+
+    private boolean hasError(List<Response<? extends Object>> respList) {
+        try {
+            for (Response<? extends Object> resp : respList) {
+                if (null == resp) {
+                    return true;
+                }
+                resp.get();
+            }
+        } catch (JedisDataException e) {
+            return true;
+        }
+        return false;
+    };
 
     private Double getCurrentCapacity(MeterReading reading) {
         return reading.getWhGenerated() - reading.getWhUsed();

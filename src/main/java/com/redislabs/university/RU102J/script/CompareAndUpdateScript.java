@@ -2,7 +2,9 @@ package com.redislabs.university.RU102J.script;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Response;
 import redis.clients.jedis.Transaction;
+import redis.clients.jedis.exceptions.JedisDataException;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -14,7 +16,6 @@ import java.util.List;
  * as requested.
  */
 public class CompareAndUpdateScript {
-
     private final String sha;
     public static String script = "" +
             "local key = KEYS[1] " +
@@ -40,23 +41,21 @@ public class CompareAndUpdateScript {
         }
     }
 
-    public void updateIfGreater(Transaction jedis, String key, String field,
-                               Double value) {
-        update(jedis, key, field, value, ScriptOperation.GREATERTHAN);
+    public Response<Object> updateIfGreater(Transaction jedis, String key, String field, Double value) {
+        return update(jedis, key, field, value, ScriptOperation.GREATERTHAN);
     }
 
-    public void updateIfLess(Transaction jedis, String key, String field,
-                               Double value) {
-        update(jedis, key, field, value, ScriptOperation.LESSTHAN);
+    public Response<Object> updateIfLess(Transaction jedis, String key, String field, Double value) {
+        return update(jedis, key, field, value, ScriptOperation.LESSTHAN);
     }
 
-    private void update(Transaction jedis, String key, String field, Double value,
-                           ScriptOperation op) {
+    private Response<Object> update(Transaction jedis, String key, String field, Double value, ScriptOperation op) {
         if (sha != null) {
             List<String> keys = Collections.singletonList(key);
-            List<String> args = Arrays.asList(field, String.valueOf(value),
-                    op.getSymbol());
-            jedis.evalsha(sha, keys, args);
+            List<String> args = Arrays.asList(field, String.valueOf(value), op.getSymbol());
+            return jedis.evalsha(sha, keys, args);
+        } else {
+            return null;
         }
     }
 }
