@@ -99,9 +99,11 @@ public class SiteStatsDaoRedisImpl implements SiteStatsDao {
         // 执行事务
         t.exec();
 
-        // 检查结果，并处理回滚（如果业务逻辑需要回滚）
+        // 检测是否有命令执行错误
         if (hasError(respList)) {
-            t.discard();
+            // 但是需要手写错误处理逻辑
+            // Redis不支持事务回滚，discard()方法只能撤销还没有exec()的命令
+		    // ...
         }
         // END Challenge #3
     }
