@@ -9,6 +9,5 @@ import java.util.List;
 
 public interface MetricDao {
     void insert(MeterReading reading);
-    List<Measurement> getRecent(Long siteId, MetricUnit unit,
-                                ZonedDateTime time,Integer limit);
+    List<Measurement> getRecent(Long siteId, MetricUnit unit, ZonedDateTime time,Integer limit);
 }

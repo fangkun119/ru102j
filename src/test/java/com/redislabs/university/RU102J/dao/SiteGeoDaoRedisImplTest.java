@@ -82,12 +82,11 @@ public class SiteGeoDaoRedisImplTest {
 
     @Test
     public void findAllWithMultipleSites() {
-        SiteGeoDao dao = new SiteGeoDaoRedisImpl(jedisPool);
+        SiteGeoDaoRedisImpl dao = new SiteGeoDaoRedisImpl(jedisPool);
         // Insert all sites
         for (Site site : sites) {
             dao.insert(site);
         }
-
         assertThat(dao.findAll(), is(sites));
     }
 
